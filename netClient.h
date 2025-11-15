@@ -9,23 +9,37 @@ namespace net {
     template <typename T>
     class clientInterface{
     public:
-        clientInterface() : _socket(_context){
+        clientInterface()
+        {
         }
 
         virtual ~clientInterface() {
             disconnect();
         }
 
+        // Send message to server
+        void send(const message<T>& msg)
+        {
+            if (isConnected())
+                _connection->send(msg);
+        }
+
         // Kết nối với server với ip và port
         bool connect(const std::string& host, const uint16_t port) {
             try {
-                // Cấp phát một vùng nhớ và trả về con trỏ unique_ptr 
-                _connection = std::make_unique<connection<T>>();
-
                 // Resolver hoạt động như 1 DNS server, nhận vào hostname/địa chỉ IP và port dưới dạng
                 // chuỗi, sau đó tìm địa chỉ IP phù hợp
                 asio::ip::tcp::resolver resolver(_context);
                 asio::ip::tcp::resolver::results_type endpoints = resolver.resolve(host, std::to_string(port));
+
+
+                // Cấp phát một vùng nhớ và trả về con trỏ unique_ptr 
+                _connection = std::make_unique<connection<T>>(
+                    connection<T>::owner::client,
+                    asio::ip::tcp::socket(_context),
+                    _context, 
+                    _qMsgsIn
+                );
 
                 _connection->connectToServer(endpoints);
             
@@ -37,7 +51,7 @@ namespace net {
                 return false;
             }
             
-            return false;
+            return true;
         }
 
         void disconnect() {
@@ -70,9 +84,6 @@ namespace net {
 
         // Luồng riêng dành cho asio context
         std::thread thrContext;
-
-        // Socket phần cứng kết nối với server
-        asio::ip::tcp::socket _socket;
 
         // Client có một instance của connection để xử lý truyền dữ liệu
         std::unique_ptr<connection<T>> _connection;

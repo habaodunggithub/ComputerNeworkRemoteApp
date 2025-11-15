@@ -3,7 +3,6 @@
 #include "netCommon.h"
 #include "netMessage.h"
 #include "netTSQueue.h"
-#include <memory>
 
 namespace net {
         // Kế thừa lớp này để tạo 1 shared_ptr (this) thay vì raw pointer
@@ -17,7 +16,7 @@ namespace net {
             };
 
             connection(owner parent, asio::ip::tcp::socket socket, asio::io_context& asioContext, TSQueue<ownedMessage<T>>& qIn)
-                : _socket(std::move(socket)), _asioContext(asioContex), _qMsgsIn(qIn)
+                : _socket(std::move(socket)), _asioContext(asioContext), _qMsgsIn(qIn)
             {
                 _nOwnerType = parent;
             }
@@ -32,16 +31,30 @@ namespace net {
                 }
             }
 
-            bool connectToServer();
+            void connectToServer(const asio::ip::tcp::resolver::results_type& endpoints) {
+                if (_nOwnerType != owner::client)
+                    return;
 
-            bool disconnect() {
+                asio::async_connect(_socket, endpoints,
+                    [this](std::error_code  ec, asio::ip::tcp::endpoint endpoint) {
+                        if (ec) {
+                            std::cout << "[" << id << "] Endpoint connect fail.\n";
+                            return;
+                        }
+
+                        readHeader();
+                    }
+                );
+            }
+
+            void disconnect() {
                 if (isConnected())
                     asio::post(_asioContext, [this]() { _socket.close(); });
             }
 
             bool isConnected() const { return _socket.is_open(); };
 
-            bool send(const message<T>& msg) {
+            void send(const message<T>& msg) {
                 asio::post(_asioContext,
                     [this, msg] () {
                         bool isWritingMsg = !_qMsgsOut.empty();
@@ -53,29 +66,16 @@ namespace net {
                 );
             }
 
+            void startListening() {
+
+            }
+
             uint32_t getID() const { return id; }
-
-        protected:
-            asio::ip::tcp::socket _socket;
-
-            // Chỉ tham chiếu đến địa chỉ để dùng chung
-            asio::io_context& _asioContext;
-        
-            // Hàng đợi này chứa tất cả các messages gửi đến bên kia của kết nối
-            TSQueue<message<T>> _qMsgsOut;
-
-            // Hàng đợi này chứa tất cả các messages đến kết nối. Nó chỉ là tham chiếu
-            // vì nó sẽ được quản lí bởi lớp khác
-            TSQueue<ownedMessage<T>>& _qMsgsIn;
-            message<T> _msgTempIn;
-            
-            owner _nOwnerType = owner::server;
-            uint32_t id = 0;
         
         private:
             void readHeader() {
-                asio::async_read(_socket, asio::buffer(&_msgTempIn.header, sizeof(messageHeader<T>), 
-                    [this](std::error_code ec, std::size_t lenght) {
+                asio::async_read(_socket, asio::buffer(&_msgTempIn.header, sizeof(messageHeader<T>)), 
+                    [this](std::error_code ec, std::size_t length) {
                         if (ec) {
                             std::cout << "[" << id << "] Read header fail.\n";
                             _socket.close();
@@ -86,8 +86,10 @@ namespace net {
                             _msgTempIn.body.resize(_msgTempIn.header.size);
                             readBody();
                         }
+                        else
+                            addToIncomingQueue();
                     }               
-                ));
+                );
             } 
 
             void readBody() {
@@ -105,7 +107,7 @@ namespace net {
             }
 
             void writeHeader() {
-                asio::async_write(_socket, asio::buffer(&_qMsgsOut.front().header, sizeof(massageHeader<T>)), 
+                asio::async_write(_socket, asio::buffer(&_qMsgsOut.front().header, sizeof(messageHeader<T>)), 
                     [this](std::error_code ec, std::size_t length) {
                         if (ec) {
                             std::cout << "[" << id << "] Write header fail.\n";
@@ -151,5 +153,24 @@ namespace net {
 
                 readHeader();
             }
+
+            protected:
+                asio::ip::tcp::socket _socket;
+            
+                // Chỉ tham chiếu đến địa chỉ để dùng chung
+                asio::io_context& _asioContext;
+            
+                // Hàng đợi này chứa tất cả các messages gửi đến bên kia của kết nối
+                TSQueue<message<T>> _qMsgsOut;
+
+                // Hàng đợi này chứa tất cả các messages đến kết nối. Nó chỉ là tham chiếu
+                // vì nó sẽ được quản lí bởi lớp khác
+                TSQueue<ownedMessage<T>>& _qMsgsIn;
+
+                message<T> _msgTempIn;
+                
+                owner _nOwnerType = owner::server;
+                
+                uint32_t id = 0;
         };
 }

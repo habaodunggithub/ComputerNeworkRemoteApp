@@ -53,9 +53,9 @@ namespace net {
                         std::cout << "[SERVER] New connection: " << socket.remote_endpoint() << "\n";
 
                         std::shared_ptr<connection<T>> newConnection = std::make_shared<connection<T>> (
-                            connection<T>::onwner::server,
-                            _asioContext,
+                            connection<T>::owner::server,
                             std::move(socket),
+                            _asioContext,
                             _qMsgsIn  
                         );
 
@@ -130,11 +130,28 @@ namespace net {
                     ++nMsgsCount;
                 }
             }
+            void update(size_t nMaxMessages = -1, bool bWait = false) {
+				if (bWait) _qMsgsIn.wait();
+
+				// Process as many messages as you can up to the value
+				// specified
+				size_t nMessageCount = 0;
+				while (nMessageCount < nMaxMessages && !_qMsgsIn.empty())
+				{
+					// Grab the front message
+					auto msg = _qMsgsIn.pop_front();
+
+					// Pass to message handler
+					onMsg(msg.remote, msg.msg);
+
+					nMessageCount++;
+				}
+			}
 
         protected:
         // Gọi hàm khi client kết nối
         virtual bool onClientConnect(std::shared_ptr<connection<T>> client) {
-            return false;
+            return true;
         }
 
         // Gọi khi client ngắt kết nối
@@ -143,7 +160,7 @@ namespace net {
         }
 
         virtual void onMsg(std::shared_ptr<connection<T>> client, message<T>& msg) {
-
+            std::cout << "Here.\n";
         }
 
         // Hàng đợi an toàn luông cho những gói tin đến

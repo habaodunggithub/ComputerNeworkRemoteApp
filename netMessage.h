@@ -15,7 +15,7 @@ namespace net {
         std::vector<uint8_t> body{};
 
         size_t size() const {
-            return sizeof(messageHeader<T>) + body.size(); 
+            return body.size(); 
         }
 
         friend std::ostream& operator<<(std::ostream& os, const message<T>& msg) {
@@ -43,7 +43,7 @@ namespace net {
         }
 
         template <typename DataType>
-        friend message<T>& operator>>(message<T>& msg, const DataType& data) {
+        friend message<T>& operator>>(message<T>& msg, DataType& data) {
             static_assert(std::is_standard_layout<DataType>::value, "Data is too complex to be pushed into vector.");
             
             // Lưu lại vị trí cuối của vector sau khi đẩy data ra
