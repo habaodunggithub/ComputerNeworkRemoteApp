@@ -52,24 +52,24 @@ namespace net {
 
                         std::cout << "[SERVER] New connection: " << socket.remote_endpoint() << "\n";
 
-                        // std::shared_ptr<connection<T>> newConnection = std::make_shared<connection<T>> (
-                        //     connection<T>::onwner::server,
-                        //     _asioContext,
-                        //     std::move(socket),
-                        //     _qMsgsIn  
-                        // );
+                        std::shared_ptr<connection<T>> newConnection = std::make_shared<connection<T>> (
+                            connection<T>::onwner::server,
+                            _asioContext,
+                            std::move(socket),
+                            _qMsgsIn  
+                        );
 
-                        // // Để server có thể từ chối kết nối hoặc không
-                        // if (onClientConnect(newConnection)) {
-                        //     _deqConnections.push_back(std::move(newConnection));
+                        // Để server có thể từ chối kết nối hoặc không
+                        if (onClientConnect(newConnection)) {
+                            _deqConnections.push_back(std::move(newConnection));
 
-                        //     _deqConnections.back()->connectToClient(nIDCounter++);
+                            _deqConnections.back()->connectToClient(nIDCounter++);
 
-                        //     std::cout << "[" << _deqConnections.back()->getID() << "] Connection approved.\n";
-                        // }
-                        // else {
-                        //     std::cout << "[-----] Connection denied.\n";
-                        // }
+                            std::cout << "[" << _deqConnections.back()->getID() << "] Connection approved.\n";
+                        }
+                        else {
+                            std::cout << "[-----] Connection denied.\n";
+                        }
 
                         // Duy trì trạng thái chờ
                         waitForClientConnection();
